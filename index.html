@@ -7,10 +7,10 @@
 <video controls></video>
 <button onclick="play()">play</button>
 
+<script src="util.js"></script>
 <script src="mp4-remuxer.js"></script>
 <script src="mp4-generator.js"></script>
 <script>
-
 
 /*var ws = new WebSocket("ws://10.129.24.17:8887/echo");
 
@@ -29,70 +29,6 @@ ws.onmessage = function(evt) {
 ws.onclose = function(evt) {
   console.log("Connection closed.");
 }*/
-
-
-function tranUint8ArrayToInt(uint8array){
-	var r= new Uint32Array(1);
-	//console.log(uint8array);
-	r[0] = (uint8array[0] & 0xFF) << 24;
-	r[0] = r[0] | (uint8array[1] & 0xFF) << 16;
-	r[0] = r[0] | (uint8array[2] & 0xFF) << 8;
-	r[0] = r[0] | (uint8array[3] & 0xFF);
-	
-	return r[0];
-}
-
-function printf_box(buf){
-	
-	console.log("buf.byteLength:"+buf.byteLength);
-	
-	var start=0
-	while(start<buf.byteLength){		
-		var boxLenArray = new Uint8Array(buf, start, 4);		
-		var boxLen = tranUint8ArrayToInt(boxLenArray);
-		var boxName = new Uint8Array(buf,start+4,4);
-		printf_array_string('boxName', boxName);
-		console.log("boxLen:"+boxLen);
-		
-		start=start+boxLen;
-		
-		if(boxLen==0){//some error accur.
-			break;
-		}
-	}
-}
-
-function printf_array_hex(name,values){
-	var hex="";
-		for(var i=0; i< values.length; i++){
-			hex = hex + " " + values[i].toString(16);
-		}
-	console.log(name+":"+hex);
-}
-
-function printf_array_string(name,values){
-	//console.log(values);
-	var str="";
-		for(var i=0; i< values.length; i++){
-			str = str + " " + String.fromCharCode(values[i]);
-		}
-	console.log(name+":"+str);
-}
-
-
-function ab2str(buf) {
-  return String.fromCharCode.apply(null, new Uint16Array(buf));
-}
-
-function str2ab(str) {
-  var buf = new ArrayBuffer(str.length); // 2 bytes for each char
-  var bufView = new Uint8Array(buf);
-  for (var i=0, strLen=str.length; i<strLen; i++) {
-    bufView[i] = str.charCodeAt(i);
-  }
-  //console.log(buf);
-  return bufView;
-}
 
 var video = document.querySelector('video');
 //var mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
@@ -136,14 +72,11 @@ function sourceClose(){
 
 init();
 
-
-
-
 var initData = "{\"id\":1,\"type\":\"video\",\"codecWidth\":600,\"codecHeight\":800,\"duration\":3000,\"timescale\":1000,\"presentWidth\":600,\"presentHeight\":800,\"avcc\":\"AUIAH\/\/hAA5nQoAf2gJgZeXgG0KE1AEABGjOBuI=\"}";
 console.log(initData);
 
 var meta = JSON.parse(initData);
-meta.avcc = str2ab(window.atob(meta.avcc));
+meta.avcc = Util.str2ab(window.atob(meta.avcc));
 console.log(meta);
 
 var ftyp = MP4.box(MP4.types.ftyp, MP4.constants.FTYP);
@@ -165,7 +98,7 @@ for(i in frames){
 	//console.log("i "+ frame.size);
 	
 	var units = [];
-	var data = str2ab(window.atob(frame.units));
+	var data = Util.str2ab(window.atob(frame.units));
 	var unit = { type: 0, data: data };
 	units.push(unit);
 	frame.units = units;
@@ -250,7 +183,7 @@ function play(){
 	console.log("play");
 	console.log(ftyp);
 	var buf = mergeBox(ftyp, moov, moof, mdat);
-	printf_box(buf);
+	Util.printFmp4Box(buf);
 	//saveAs(new Blob([buf]), 'android.mp4');
 	
 	sourceBuffer.addEventListener('updateend', function (_) {
