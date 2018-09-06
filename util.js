@@ -3,11 +3,10 @@ class Util {
 	
 	/*
 	 * 调试打印fmp4 arraybuffer里的各个box
+	 * buf: arraybuffer
 	 */
-	static printFmp4Box(buf){
-	
-		console.log("buf.byteLength:"+buf.byteLength);
-		
+	static printFmp4Box(buf){	
+		//console.log("buf.byteLength:"+buf.byteLength);		
 		var start=0
 		while(start<buf.byteLength){		
 			var boxLenArray = new Uint8Array(buf, start, 4);		
@@ -18,7 +17,7 @@ class Util {
 			
 			start=start+boxLen;
 			
-			if(boxLen==0){//some error accur.
+			if(boxLen<12){//some error accur.
 				break;
 			}
 		}
@@ -44,6 +43,9 @@ class Util {
 		return r[0];
 	}	
 
+	/*
+	 * values: Uint8Array
+	 */
 	static _printfUint8ArrayByString(values){
 		var str="";
 		for(var i=0; i< values.length; i++){
@@ -88,8 +90,16 @@ class Util {
 	
 	/*
 	 * 合并box
+	 * arr1: Uint8Array
+	 * arr2: Uint8Array
 	 */	
-	static mergeBox(ftyp, moov, moof, mdat){
+	static appendU8Array(arr1, arr2){		
+		var result = new Uint8Array(arr1.byteLength + arr2.byteLength);		
+		result.set(arr1, 0);
+		result.set(arr2, arr1.byteLength);		
+		return result;
+	}
+	/*static mergeBox(ftyp, moov, moof, mdat){
 		var result = new Uint8Array(ftyp.byteLength + moov.byteLength + mdat.byteLength + moof.byteLength);
 		
 		result.set(ftyp, 0);
@@ -98,7 +108,7 @@ class Util {
 		result.set(mdat, ftyp.byteLength + moov.byteLength + moof.byteLength);
 		
 		return result.buffer;
-	}
+	}*/
 	
 	/*
 	 * 解析mp4帧，主要是解析其中的二进制串
@@ -118,7 +128,7 @@ class Util {
 			frame.units = units;
 			
 			mp4Samples.push(frame);
-			console.log(frame);
+			//console.log(frame.units[0]);
 		}
 		return mp4Samples;
 	}
@@ -127,13 +137,13 @@ class Util {
 	 * 构造mdat
 	 */	
 	static mdat(mp4Samples){
-		console.log("making mdat-----------------------------------");
+		//console.log("making mdat-----------------------------------");
 		
 		var mdatBytes = Util._calcMdatBytes(mp4Samples);
-		console.log("mdatBytes: "+mdatBytes);
+		//console.log("mdatBytes: "+mdatBytes);
 		
 		// allocate mdatbox
-		mdat = new Uint8Array(mdatBytes);
+		var mdat = new Uint8Array(mdatBytes);
 		mdat[0] = mdatBytes >>> 24 & 0xFF;
 		mdat[1] = mdatBytes >>> 16 & 0xFF;
 		mdat[2] = mdatBytes >>> 8 & 0xFF;
@@ -147,10 +157,9 @@ class Util {
 			while (units.length) {
 				var unit = units.shift();
 				var data = unit.data;
-				console.log(_i2 + " " + data.byteLength);
+				//console.log(_i2 + " " + data.byteLength);
 				mdat.set(data, offset);
 				offset += data.byteLength;
-				//console.log(offset);
 			}				
 		}
 		return mdat;
@@ -174,8 +183,12 @@ class Util {
 		track.length=0;
 		track.samples=mp4Samples;
 		track.sequenceNumber=1;	
+		
+		
 
-		var firstDts=0;		
+		var firstDts=mp4Samples[0].dts;	
+		//console.log("firstDts-----");		
+		//console.log(firstDts);		
 		var moof =MP4.moof(track, firstDts);
 		return moof;
 	}

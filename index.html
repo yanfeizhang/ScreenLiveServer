@@ -16,8 +16,8 @@
 var video = document.querySelector('video');
 //var mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
 //var mimeCodec = 'video/mp4; codecs=avc1.640015';
-//var mimeCodec = 'video/mp4; codecs=avc1.42001f;';
-var mimeCodec = 'video/mp4; codecs=avc1.42E01E;';
+var mimeCodec = 'video/mp4; codecs=avc1.42001f;';
+//var mimeCodec = 'video/mp4; codecs=avc1.42E01E;';
 var sourceBuffer;
 
 function init(){
@@ -57,7 +57,7 @@ function sourceClose(){
 init();
 
 
-var ws = new WebSocket("ws://10.129.27.249:8887/echo");
+var ws = new WebSocket("ws://10.129.20.53:8887/echo");
 
 ws.onopen = function(evt) { 
   console.log("Connection open ..."); 
@@ -84,41 +84,34 @@ ws.onclose = function(evt) {
   console.log("Connection closed.");
 }
 
-var ftyp;
-var moov;
-var moof;
-var mdat;
+var header;
+var body;
 
 function handleInitData(initData){
-	console.log("ftyp-----------------------------");
 	ftyp = MP4.box(MP4.types.ftyp, MP4.constants.FTYP);
-	console.log(ftyp);
 	
 	var meta=initData;
 	meta.avcc = Util.str2ab(window.atob(meta.avcc));
-	console.log(meta);
 
 	moov = MP4.moov(meta);
-	console.log("moov-----------------------------");
+	
+	header = Util.appendU8Array(ftyp, moov);
+	
+	/*console.log("header-----------------------------");
+	console.log(header);
+	Util.printFmp4Box(header.buffer);
+	console.log(ftyp);
 	console.log(moov);
+	console.log(meta);*/
 }
 
 function prepareSourceBuffer(){
-	console.log("prepareSourceBuffer");
+	console.log("prepareSourceBuffer");	
 	
-	console.log("ftyp-----------------------");	
-	console.log(ftyp);
-	console.log("moov-----------------------");
-	console.log(moov);
+	var fmp4 = Util.appendU8Array(header, body);
 	
-	console.log("mdat-----------------------");	
-	console.log(mdat);
-	console.log("moof-----------------------");
-	console.log(moof);
-	
-	var buf = Util.mergeBox(ftyp, moov, moof, mdat);
-	Util.printFmp4Box(buf);
-	Util.saveAs(new Blob([buf]), 'android.mp4');
+	Util.printFmp4Box(fmp4.buffer);
+	Util.saveAs(new Blob([fmp4.buffer]), 'android.mp4');
 	
 	sourceBuffer.addEventListener('updateend', function (_) {
 			console.log("updateend");
@@ -126,7 +119,7 @@ function prepareSourceBuffer(){
 			
 	});
 
-	sourceBuffer.appendBuffer(buf);
+	sourceBuffer.appendBuffer(fmp4.buffer);
 	console.log(sourceBuffer);
 	
 }
@@ -135,10 +128,39 @@ function prepareSourceBuffer(){
 function handleMediaData(framesData){	
 	
 	var mp4Samples = Util.parseMp4Samples(framesData);
+	console.log("mp4Samples----------------");
 	console.log(mp4Samples);
 	
-	mdat = Util.mdat(mp4Samples);
-	moof = Util.moof(mp4Samples);	
+	var lastSample = mp4Samples.pop();
+	var lastSamples=[];
+	lastSamples.push(lastSample);
+		
+	/*console.log("mp4Samples----------------");
+	console.log(mp4Samples);	
+	console.log("lastSamples----------------");
+	console.log(lastSamples);*/
+	
+	//segment
+	var moof = Util.moof(mp4Samples);
+	var mdat = Util.mdat(mp4Samples);	
+	body = Util.appendU8Array(moof, mdat);
+	
+	/*console.log("body--------------------");
+	console.log(moof);	
+	console.log(mdat);
+	console.log(body);
+	Util.printFmp4Box(body.buffer);*/
+
+	//segment
+	moof = Util.moof(lastSamples);	
+	mdat = Util.mdat(lastSamples);
+	body = Util.appendU8Array(body, moof);
+	body = Util.appendU8Array(body, mdat);
+	
+	/*console.log("body--------------------");
+	console.log(body);
+	console.log(moof);	
+	Util.printFmp4Box(body.buffer);*/
 	
 	prepareSourceBuffer();
 }
